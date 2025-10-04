@@ -1,0 +1,29 @@
+---
+- name: Introduce a FATAL configuration error by disabling a core MPM module
+  hosts: all
+  become: true
+  
+  tasks:
+    - name: Task 1 - Ensure httpd is installed
+      ansible.builtin.dnf:
+        name: httpd
+        state: present
+
+    # ESTE PASSO GERA O ERRO FATAL: Comenta a linha que carrega um módulo essencial (MPM Event)
+    - name: Task 2 - Comment out the LoadModule for mpm_event_module
+      ansible.builtin.lineinfile:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: '^LoadModule mpm_event_module modules/mod_mpm_event.so'
+        line: '#LoadModule mpm_event_module modules/mod_mpm_event.so' # Comenta a linha
+        state: present
+      notify:
+        - Restart apache
+
+  handlers:
+    - name: Restart apache
+      ansible.builtin.service:
+        name: httpd
+        state: restarted
+      register: httpd_restart_result
+      # Configuramos para falhar, garantindo o log de erro fatal
+      failed_when: "'Job for httpd.service failed' not in httpd_restart_result.msg | default('')"
