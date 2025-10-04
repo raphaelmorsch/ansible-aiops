@@ -1,0 +1,30 @@
+---
+- name: Critical Configuration Error Detection (AIOps Trigger)
+  hosts: all
+  sources:
+    - ansible.eda.kafka:
+        host: service1
+        port: 9092
+        topic: httpd-error-logs # Assumindo que este é o tópico que recebe os logs do Filebeat
+
+  rules:
+    # ----------------------------------------------------
+    # REGRA PRINCIPAL: Captura o erro fatal de configuração (Nosso cenário de demo)
+    # ----------------------------------------------------
+    - name: apache critical config error
+      # Procura por frases que indicam falha de configuração na inicialização
+      condition: event.body.message is search("Configuration error") or event.body.message is search("No MPM loaded")
+      action:
+        run_workflow_template:
+          organization: "Default"
+          # Este workflow acionará o Granite para diagnóstico e o Lightspeed para criação do Playbook
+          name: "AI Insights and Lightspeed prompt generation" # Nome do seu workflow de AIOps
+          
+    # ----------------------------------------------------
+    # REGRA DE DEBUG (Opcional, mas útil para verificação)
+    # ----------------------------------------------------
+    - name: show all event messages for debug
+      condition: event.body.message is defined
+      action:
+        debug:
+          msg: "Nova Regra de Alerta: {{ event.body.message }}"
