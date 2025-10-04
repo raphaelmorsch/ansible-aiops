@@ -1,0 +1,29 @@
+---
+- name: Fix Apache DocumentRoot Permissions and Restore SELinux Context
+  hosts: all
+  become: true
+  
+  # Variáveis opcionais para reutilização
+  vars:
+    apache_document_root: /var/www/html
+    correct_mode: '0755'
+
+  tasks:
+    - name: Task 1 - Restore correct permissions (mode 0755) to DocumentRoot
+      ansible.builtin.file:
+        path: "{{ apache_document_root }}"
+        state: directory
+        mode: "{{ correct_mode }}" # 0755 permite leitura e execução pelo grupo (onde o Apache está)
+      
+    - name: Task 2 - Restore default SELinux file contexts
+      ansible.builtin.command: 
+        cmd: "restorecon -Rv {{ apache_document_root }}"
+      # O SELinux é uma fonte comum de erros de permissão, e esta é a correção padrão.
+      # Usamos 'command' aqui, pois é uma tarefa de sistema específica.
+
+  # O handler é executado apenas se o arquivo foi modificado (e o problema resolvido)
+  handlers:
+    - name: Restart apache service
+      ansible.builtin.service:
+        name: httpd
+        state: restarted
