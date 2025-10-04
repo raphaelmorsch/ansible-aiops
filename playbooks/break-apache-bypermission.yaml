@@ -12,7 +12,7 @@
     # ESTE É O PASSO QUE CRIA O PROBLEMA
     - name: Change permissions of DocumentRoot to block Apache access (e.g., 000)
       ansible.builtin.file:
-        path: /var/www/html
+        path: /var/log/httpd
         state: directory
         mode: '000' # Permissão total de bloqueio para todos
         # owner: root
