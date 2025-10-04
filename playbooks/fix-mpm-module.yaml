@@ -1,0 +1,20 @@
+---
+- name: Fix fatal configuration error by enabling core MPM module
+  hosts: all
+  become: true
+  
+  tasks:
+    - name: Task 1 - Uncomment the LoadModule for mpm_event_module
+      ansible.builtin.lineinfile:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: '^#LoadModule mpm_event_module modules/mod_mpm_event.so'
+        line: 'LoadModule mpm_event_module modules/mod_mpm_event.so' # Remove o '#'
+        state: present
+      notify:
+        - Restart apache
+
+  handlers:
+    - name: Restart apache
+      ansible.builtin.service:
+        name: httpd
+        state: restarted
