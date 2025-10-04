@@ -1,0 +1,31 @@
+---
+- name: Introduce a permissions error to break Apache access
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Ensure Apache is installed
+      ansible.builtin.dnf:
+        name: httpd
+        state: present
+        
+    # ESTE É O PASSO QUE CRIA O PROBLEMA
+    - name: Change permissions of DocumentRoot to block Apache access (e.g., 000)
+      ansible.builtin.file:
+        path: /var/www/html
+        state: directory
+        mode: '000' # Permissão total de bloqueio para todos
+        # owner: root
+        # group: root
+      notify:
+        - Restart apache
+        
+  handlers:
+    - name: Restart apache
+      ansible.builtin.service:
+        name: httpd
+        state: restarted
+      register: httpd_restart_result
+      # O serviço pode até tentar iniciar, mas a checagem de config pode falhar ou o serviço vai quebrar ao tentar servir o primeiro request.
+      # Mantenha o failed_when para garantir que o workflow seja acionado, caso o restart falhe.
+      failed_when: "'Job for httpd.service failed' not in httpd_restart_result.msg | default('')"
