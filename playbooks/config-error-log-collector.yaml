@@ -1,0 +1,52 @@
+---
+- name: Collect Diagnostics and Prepare AI Prompts for Critical Failure
+  hosts: all
+  become: true
+  gather_facts: false
+  
+  vars:
+    # Definido via input ou padrão
+    linux_service: "{{ input_linux_service | default('httpd') }}" 
+
+  tasks:
+    - name: Task 1 - Display Service being analyzed
+      ansible.builtin.debug:
+        msg: "Analisando logs do serviço {{ linux_service }} para diagnóstico de IA."
+
+    - name: Task 2 - Retrieve last 20 lines of service logs (critical context)
+      # Buscamos mais linhas (20) para dar mais contexto ao Granite sobre a falha.
+      ansible.builtin.command: "journalctl -u {{ linux_service }}.service -n 20 --no-pager"
+      register: systemd_logs
+      ignore_errors: true
+      changed_when: false
+
+    - name: Task 3 - Store systemd logs as a variable
+      ansible.builtin.set_fact:
+        systemd_log_output: "{{ systemd_logs.stdout }}"
+
+    - name: Task 4 - Escape newlines for AI prompt formatting
+      # Essencial para garantir que o prompt GPT/Granite não quebre
+      ansible.builtin.set_fact:
+        systemd_log_output_escaped: "{{ systemd_log_output | regex_replace('(\r?\n)', '\\\\n') }}"
+
+    - name: Task 5 - Set Stats for Granite (GPT) and RCA Prompts
+      # Esta task prepara os dados necessários para o próximo Job do Controller (que chama a IA)
+      ansible.builtin.set_stats:
+        data:
+          slack_message: |
+            ALERTA CRÍTICO: Falha de Configuração no {{ linux_service }}! O serviço está em estado inconsistente e logs indicam erro de carregamento de módulo.
+
+            Logs recentes: {{ systemd_log_output }}
+          max_tokens: 50
+          gpt_prompt: >-
+            \n### Instruções:\nO serviço {{ linux_service }} está falhando devido a um erro de configuração. Baseado nos logs, forneça uma instrução de correção única e concisa (1-2 linhas). Inclua o restart do serviço.\n
+            \n### Logs:\n{{ systemd_log_output_escaped }}\n
+            \n### Correção:\n
+          rca_prompt: >-
+            ### Instruções:
+            O serviço {{ linux_service }} está falhando. Analise os logs e gere uma Análise de Causa Raiz (RCA) detalhada.
+
+            ### Logs:
+            {{ systemd_log_output_escaped }}
+
+            ### RCA:
